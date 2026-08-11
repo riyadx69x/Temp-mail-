@@ -21,8 +21,9 @@ def generate_random_string(length=8):
     return "".join(random.choice(letters) for i in range(length))
 
 def get_main_keyboard():
-    keyboard = [["➕ Generate New / Delete", "🔄 Refresh Inbox"]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    # একদম স্ক্রিনশটের মতো নিচের মেনু বাটন
+    keyboard = [["➕ Generate New / Delete", "🔄 Refresh"]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -32,12 +33,10 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
     try:
         domain_res = requests.get(f"{BASE_URL}/domains")
         if domain_res.status_code != 200:
-            await update.message.reply_text("❌ Failed to fetch domains.")
             return
 
         domains = domain_res.json().get("hydra:member", [])
         if not domains:
-            await update.message.reply_text("❌ No domains available.")
             return
 
         domain = domains[0]["domain"]
@@ -61,12 +60,12 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             token = token_res.json().get("token")
             user_sessions[user_id] = {"email": email, "token": token}
 
+            # স্ক্রিনশটের হুবহু লেআউট অনুযায়ী শুধু ইমেইল এবং ব্রাউজার বাটন
             response_text = f"Your temporary email address:\n\n`{email}`"
 
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            # এখানে শুধু ইমেইল এবং ব্রাউজার বাটন পাঠানো হবে, নিচে আর কোনো অতিরিক্ত টেক্সট মেসেজ পাঠানো হবে না
             await update.message.reply_text(
                 response_text, 
                 parse_mode="Markdown", 
@@ -74,7 +73,7 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             )
 
     except Exception as e:
-        await update.message.reply_text(f"❌ Error: {e}")
+        pass
 
 async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual=True):
     user_id = update.effective_user.id
@@ -149,8 +148,12 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id in user_sessions:
             del user_sessions[user_id]
         await create_or_refresh_account(update, context, user_id)
-    elif text == "🔄 Refresh Inbox":
+    elif text == "🔄 Refresh":
         await check_inbox(update, context, manual=True)
+
+async def send_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    # ইউজার যেকোনো সময় চ্যাটে বাটন ওপেন রাখতে চাইলে এই কমান্ড বা হ্যান্ডলার কাজ করবে
+    await update.message.reply_text("Menu:", reply_markup=get_main_keyboard())
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -158,5 +161,6 @@ if __name__ == "__main__":
     app.job_queue.run_repeating(background_inbox_checker, interval=5, first=5)
 
     app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("menu", send_menu))
     app.add_handler(MessageHandler(filters.TEXT, handle_buttons))
     app.run_polling()
