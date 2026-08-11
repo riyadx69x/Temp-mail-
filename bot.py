@@ -21,7 +21,7 @@ def generate_random_string(length=8):
     return "".join(random.choice(letters) for i in range(length))
 
 def get_main_keyboard():
-    # একদম স্ক্রিনশটের মতো নিচের মেনু বাটন
+    # একদম আপনার পছন্দের মতো নিচের ফিক্সড মেনু বাটন
     keyboard = [["➕ Generate New / Delete", "🔄 Refresh"]]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
 
@@ -60,15 +60,17 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             token = token_res.json().get("token")
             user_sessions[user_id] = {"email": email, "token": token}
 
-            # স্ক্রিনশটের হুবহু লেআউট অনুযায়ী শুধু ইমেইল এবং ব্রাউজার বাটন
+            # শুধু ইমেইল এবং ব্রাউজার বাটন (কোনো বাড়তি টেক্সট বা আবোল-তাবোল নেই)
             response_text = f"Your temporary email address:\n\n`{email}`"
 
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            await update.message.reply_text(
-                response_text, 
-                parse_mode="Markdown", 
+            chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=response_text,
+                parse_mode="Markdown",
                 reply_markup=reply_markup
             )
 
@@ -90,7 +92,8 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
         messages = msg_res.json().get("hydra:member", [])
         if not messages:
             if manual:
-                await update.message.reply_text("📭 Inbox is empty. No new messages yet.")
+                chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
+                await context.bot.send_message(chat_id=chat_id, text="📭 Inbox is empty. No new messages yet.")
         else:
             for msg in messages:
                 msg_id = msg['id']
@@ -114,9 +117,10 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
                 else:
                     code_display = f"`{text_body[:50]}`"
 
+                # অন্য বটের মতো সুন্দর মেসেজ ডিজাইন
                 formatted_msg = (
-                    f"New email message\n\n"
-                    f"From: \"{sender.split('@')[0]}\" <{sender}>\n\n"
+                    f"Email messages\n\n"
+                    f"1) From: \"{sender.split('@')[0]}\" <{sender}>\n"
                     f"Subject: {subject}\n\n"
                     f"{code_display}"
                 )
@@ -152,12 +156,12 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await check_inbox(update, context, manual=True)
 
 async def send_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    # ইউজার যেকোনো সময় চ্যাটে বাটন ওপেন রাখতে চাইলে এই কমান্ড বা হ্যান্ডলার কাজ করবে
-    await update.message.reply_text("Menu:", reply_markup=get_main_keyboard())
+    await update.message.reply_text("Menu activated:", reply_markup=get_main_keyboard())
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
+    # অটোমেটিক ব্যাকগ্রাউন্ড চেক (প্রতি ৫ সেকেন্ড পর পর মেইল আসলে নিজে থেকেই বটে চলে আসবে)
     app.job_queue.run_repeating(background_inbox_checker, interval=5, first=5)
 
     app.add_handler(CommandHandler("start", start))
