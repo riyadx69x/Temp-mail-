@@ -66,14 +66,12 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            # এখানে শুধু ইমেইল এবং নিচের কিবোর্ড বাটনগুলো সেট করা হয়েছে, অতিরিক্ত কোনো ইমোজি বা টেক্সট নেই
+            # এখানে শুধু ইমেইল এবং ব্রাউজার বাটন পাঠানো হবে, নিচে আর কোনো অতিরিক্ত টেক্সট মেসেজ পাঠানো হবে না
             await update.message.reply_text(
                 response_text, 
                 parse_mode="Markdown", 
                 reply_markup=reply_markup
             )
-            # কিবোর্ড মেনু এক্টিভ রাখার জন্য নিচের লাইনটি রাখা হয়েছে যাতে নিচে বাটনগুলো সবসময় থাকে
-            await update.message.reply_text("Select an option:", reply_markup=get_main_keyboard())
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
@@ -93,7 +91,7 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
         messages = msg_res.json().get("hydra:member", [])
         if not messages:
             if manual:
-                await update.message.reply_text("📭 Inbox is empty. No new messages yet.", reply_markup=get_main_keyboard())
+                await update.message.reply_text("📭 Inbox is empty. No new messages yet.")
         else:
             for msg in messages:
                 msg_id = msg['id']
