@@ -160,7 +160,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
     
-    app.job_queue.run_repeating(background_inbox_checker, interval=3, first=3)
+    app.job_queue.run_repeating(background_inbox_checker, interval=5, first=5)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, handle_buttons))
