@@ -21,9 +21,8 @@ def generate_random_string(length=8):
     return "".join(random.choice(letters) for i in range(length))
 
 def get_main_keyboard():
-    # এটি চ্যাট বক্সের নিচে ফিক্সড মেনু বাটন শো করবে
-    keyboard = [["➕ Generate New / Delete", "🔄 Refresh"]]
-    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
+    keyboard = [["➕ Generate New / Delete", "🔄 Refresh Inbox"]]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -33,10 +32,12 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
     try:
         domain_res = requests.get(f"{BASE_URL}/domains")
         if domain_res.status_code != 200:
+            await update.message.reply_text("❌ Failed to fetch domains.")
             return
 
         domains = domain_res.json().get("hydra:member", [])
         if not domains:
+            await update.message.reply_text("❌ No domains available.")
             return
 
         domain = domains[0]["domain"]
@@ -65,25 +66,23 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
+            # এখানে শুধু ইমেইল এবং নিচের কিবোর্ড বাটনগুলো এক সাথে সেট করা হয়েছে (অতিরিক্ত কোনো টেক্সট নেই)
             chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
-            
-            # ইমেইল পাঠানোর সময় নিচের মেনু কিবোর্ড বাটনগুলো বাধ্যতামূলকভাবে যুক্ত করে দেওয়া হলো
             await context.bot.send_message(
                 chat_id=chat_id,
-                text=response_text,
-                parse_mode="Markdown",
+                text=response_text, 
+                parse_mode="Markdown", 
                 reply_markup=reply_markup
             )
-            
-            # মেনু বাটন ফিক্সড রাখার জন্য ব্ল্যাঙ্ক বা মেনু অ্যাক্টিভেশন মেসেজ পাঠানো
+            # টেক্সট ছাড়াই শুধু নিচের মেনু কিবোর্ড বাটনগুলো একটিভ রাখার জন্য ব্যাকগ্রাউন্ডে কমান্ড পাঠানো হয়েছে
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="Menu ready 👇",
+                text="Generated successfully 👇",
                 reply_markup=get_main_keyboard()
             )
 
     except Exception as e:
-        pass
+        await update.message.reply_text(f"❌ Error: {e}")
 
 async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual=True):
     user_id = update.effective_user.id
@@ -100,8 +99,7 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
         messages = msg_res.json().get("hydra:member", [])
         if not messages:
             if manual:
-                chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
-                await context.bot.send_message(chat_id=chat_id, text="📭 Inbox is empty. No new messages yet.", reply_markup=get_main_keyboard())
+                await update.message.reply_text("📭 Inbox is empty. No new messages yet.", reply_markup=get_main_keyboard())
         else:
             for msg in messages:
                 msg_id = msg['id']
@@ -126,8 +124,8 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
                     code_display = f"`{text_body[:50]}`"
 
                 formatted_msg = (
-                    f"Email messages\n\n"
-                    f"1) From: \"{sender.split('@')[0]}\" <{sender}>\n"
+                    f"New email message\n\n"
+                    f"From: \"{sender.split('@')[0]}\" <{sender}>\n\n"
                     f"Subject: {subject}\n\n"
                     f"{code_display}"
                 )
@@ -159,7 +157,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if user_id in user_sessions:
             del user_sessions[user_id]
         await create_or_refresh_account(update, context, user_id)
-    elif text == "🔄 Refresh":
+    elif text == "🔄 Refresh Inbox":
         await check_inbox(update, context, manual=True)
 
 if __name__ == "__main__":
