@@ -1,5 +1,6 @@
 import random
 import string
+import re
 import requests
 from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -11,7 +12,7 @@ from telegram.ext import (
 )
 
 BOT_TOKEN = "8688225861:AAHT-8_7O0PDRjy3cWTEp6gfW3b-vpb-CSA"
-BASE_URL = "https://api.mail.tm"
+BASE_URL = "[https://api.mail.tm](https://api.mail.tm)"
 user_sessions = {}
 
 def generate_random_string(length=8):
@@ -24,9 +25,9 @@ def get_main_keyboard():
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    await create_or_refresh_account(update, context, user_id, is_new=True)
+    await create_or_refresh_account(update, context, user_id)
 
-async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int, is_new=False, old_email=None):
+async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
     try:
         domain_res = requests.get(f"{BASE_URL}/domains")
         if domain_res.status_code != 200:
@@ -39,7 +40,7 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             return
 
         domain = domains[0]["domain"]
-        username = f"user_{generate_random_string(6)}"
+        username = f"Hunter_{generate_random_string(6)}"
         email = f"{username}@{domain}"
         password = generate_random_string(10)
 
@@ -59,13 +60,10 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             token = token_res.json().get("token")
             user_sessions[user_id] = {"email": email, "token": token}
 
-            response_text = ""
-            if not is_new and old_email:
-                response_text += f"Your old email address has been successfully deleted\n\n"
-            
-            response_text += f"New temporary email address:\n\n`{email}`"
+            # শুধু নতুন জিমেইল দেখাবে, ডিলিট হওয়া বা অন্য কোনো মেসেজ আসবে না
+            response_text = f"Your temporary email address:\n\n`{email}`"
 
-            keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
+            keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"[https://mail.tm/inbox](https://mail.tm/inbox)")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await update.message.reply_text(
@@ -73,7 +71,6 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
                 parse_mode="Markdown", 
                 reply_markup=reply_markup
             )
-            # কিবোর্ড বাটনগুলো নিচে এক্টিভ রাখার জন্য
             await update.message.reply_text("Select an option below:", reply_markup=get_main_keyboard())
 
     except Exception as e:
@@ -82,7 +79,7 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
 async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id not in user_sessions:
-        await create_or_refresh_account(update, context, user_id, is_new=True)
+        await create_or_refresh_account(update, context, user_id)
         return
 
     token = user_sessions[user_id]["token"]
@@ -99,21 +96,26 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 detail_res = requests.get(f"{BASE_URL}/messages/{msg_id}", headers=headers)
                 detail = detail_res.json()
                 
-                sender = detail.get('from', {}).get('address', 'Unknown')
-                subject = detail.get('subject', 'No Subject')
                 text_body = detail.get('text', '') or detail.get('intro', '')
                 
-                # স্ক্রিনশটের ডিজাইনের সাথে মিলিয়ে মেসেজ ফরম্যাট
-                formatted_msg = (
-                    f"New email message\n\n"
-                    f"From: \"{sender.split('@')[0]}\" <{sender}>\n\n"
-                    f"Subject: {subject}\n\n"
-                    f"`{text_body}`"
-                )
+                # মেসেজ থেকে শুধু 4 থেকে 6 ডিজিটের ওটিপি/কোড খুঁজে বের করার চেষ্টা করা (যেমন Subject বা Body থেকে)
+                subject = detail.get('subject', '')
+                full_text = f"{subject} {text_body}"
                 
-                keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
+                # কোড বা ওটিপি খোঁজার রেগুলার এক্সপ্রেশন
+                code_match = re.search(r'\b\d{4,6}\b', full_text)
+                
+                if code_match:
+                    otp_code = code_match.group(0)
+                    formatted_msg = f"`{otp_code}`"
+                else:
+                    # যদি কোনো সংখ্যা বা কোড না পাওয়া যায়, তবে পুরো বডি বা সাবজেক্ট দেখাবে
+                    formatted_msg = f"`{text_body[:100]}`"
+                
+                keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"[https://mail.tm/inbox](https://mail.tm/inbox)")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
+                # শুধু ওটিপি বা কোডটি ব্যাকটিক্সে পাঠানো হবে যেন ১ ক্লিকে কপি করা যায়
                 await update.message.reply_text(
                     formatted_msg, 
                     parse_mode="Markdown", 
@@ -126,11 +128,10 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     user_id = update.effective_user.id
     if text == "➕ Generate New / Delete":
-        old_email = None
         if user_id in user_sessions:
-            old_email = user_sessions[user_id]["email"]
             del user_sessions[user_id]
-        await create_or_refresh_account(update, context, user_id, is_new=False, old_email=old_email)
+        # ডিলিট হওয়ার কোনো মেসেজ না দেখিয়ে সরাসরি নতুন জিমেইল জেনারেট করবে
+        await create_or_refresh_account(update, context, user_id)
     elif text == "🔄 Refresh Inbox":
         await check_inbox(update, context)
 
