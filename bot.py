@@ -10,9 +10,8 @@ from telegram.ext import (
     filters,
 )
 
-# Configuration
 BOT_TOKEN = "8688225861:AAHT-8_7O0PDRjy3cWTEp6gfW3b-vpb-CSA"
-BASE_URL = "https://api.mail.tm"
+BASE_URL = "[https://api.mail.tm](https://api.mail.tm)"
 user_sessions = {}
 
 def generate_random_string(length=8):
@@ -60,15 +59,13 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             token = token_res.json().get("token")
             user_sessions[user_id] = {"email": email, "token": token}
 
-            keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-
+            # শুধু ইমেইল এড্রেসটি ব্যাকটিক্স দিয়ে পাঠানো হলো যাতে ১ ক্লিকে কপি করা যায়
+            msg = f"Your temporary email address:\n\n`{email}`"
             await update.message.reply_text(
-                f"Your temporary email address:\n\n`{email}`", 
+                msg, 
                 parse_mode="Markdown", 
-                reply_markup=reply_markup
+                reply_markup=get_main_keyboard()
             )
-            await update.message.reply_text("Use the buttons below:", reply_markup=get_main_keyboard())
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
@@ -86,19 +83,30 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if msg_res.status_code == 200:
         messages = msg_res.json().get("hydra:member", [])
         if not messages:
-            await update.message.reply_text("📭 Inbox is empty.")
+            await update.message.reply_text("📭 Inbox is empty. No new messages yet.", reply_markup=get_main_keyboard())
         else:
             for msg in messages:
                 msg_id = msg['id']
                 detail_res = requests.get(f"{BASE_URL}/messages/{msg_id}", headers=headers)
                 detail = detail_res.json()
                 
-                text = f"New email message\n\nFrom: {detail.get('from', {}).get('address')}\nSubject: {detail.get('subject')}\n\n{detail.get('text', '')}"
+                subject = detail.get('subject', '')
+                text_body = detail.get('text', '') or detail.get('intro', '')
                 
-                keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
-                await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
+                # ওটিপি বা মেসেজটিকে কোড ব্লকে (Backticks) সাজানো যাতে ১ ক্লিকে কপি করা যায়
+                formatted_msg = (
+                    f"📩 **New Message Received!**\n\n"
+                    f"📌 **Subject:** {subject}\n\n"
+                    f"💬 **Content / OTP:**\n`{text_body}`"
+                )
+                
+                await update.message.reply_text(
+                    formatted_msg, 
+                    parse_mode="Markdown", 
+                    reply_markup=get_main_keyboard()
+                )
     else:
-        await update.message.reply_text("❌ Error checking inbox.")
+        await update.message.reply_text("❌ Error checking inbox.", reply_markup=get_main_keyboard())
 
 async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
