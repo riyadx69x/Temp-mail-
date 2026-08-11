@@ -66,20 +66,14 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            # এখানে শুধু ইমেইল এবং নিচের কিবোর্ড বাটনগুলো এক সাথে সেট করা হয়েছে (অতিরিক্ত কোনো টেক্সট নেই)
-            chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=response_text, 
+            # এখানে শুধু ইমেইল এবং নিচের কিবোর্ড বাটনগুলো সেট করা হয়েছে, অতিরিক্ত কোনো ইমোজি বা টেক্সট নেই
+            await update.message.reply_text(
+                response_text, 
                 parse_mode="Markdown", 
                 reply_markup=reply_markup
             )
-            # টেক্সট ছাড়াই শুধু নিচের মেনু কিবোর্ড বাটনগুলো একটিভ রাখার জন্য ব্যাকগ্রাউন্ডে কমান্ড পাঠানো হয়েছে
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="Generated successfully 👇",
-                reply_markup=get_main_keyboard()
-            )
+            # কিবোর্ড মেনু এক্টিভ রাখার জন্য নিচের লাইনটি রাখা হয়েছে যাতে নিচে বাটনগুলো সবসময় থাকে
+            await update.message.reply_text("Select an option:", reply_markup=get_main_keyboard())
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
