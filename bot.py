@@ -1,7 +1,6 @@
 import random
 import string
 import re
-import asyncio
 import requests
 from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -62,7 +61,6 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             token = token_res.json().get("token")
             user_sessions[user_id] = {"email": email, "token": token}
 
-            # শুধু ইমেইল এড্রেসটি দেখাবে, কোনো বাড়তি মেসেজ থাকবে না
             response_text = f"Your temporary email address:\n\n`{email}`"
 
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
@@ -71,10 +69,8 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             await update.message.reply_text(
                 response_text, 
                 parse_mode="Markdown", 
-                reply_markup=reply_markup,
-                reply_to_message_handler=get_main_keyboard()
+                reply_markup=reply_markup
             )
-            # কিবোর্ড বাটন যুক্ত করে পাঠানো
             await update.message.reply_text("👇", reply_markup=get_main_keyboard())
 
     except Exception as e:
@@ -119,7 +115,6 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
                 else:
                     code_display = f"`{text_body[:50]}`"
 
-                # স্ক্রিনশটের হুবহু লেআউট অনুযায়ী ডিজাইন
                 formatted_msg = (
                     f"New email message\n\n"
                     f"From: \"{sender.split('@')[0]}\" <{sender}>\n\n"
@@ -130,8 +125,7 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
                 keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
-                # কার কাছে মেসেজ পাঠাতে হবে তা নিশ্চিত করা
-                chat_id = update.effective_chat.id if update else user_id
+                chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
                 await context.bot.send_message(
                     chat_id=chat_id,
                     text=formatted_msg,
@@ -144,6 +138,7 @@ async def background_inbox_checker(context: ContextTypes.DEFAULT_TYPE):
         class DummyUpdate:
             pass
         dummy = DummyUpdate()
+        dummy.effective_chat = type('obj', (object,), {'id': user_id})()
         dummy.effective_user = type('obj', (object,), {'id': user_id})()
         await check_inbox(dummy, context, manual=False)
 
@@ -159,7 +154,8 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
-    
+
+    # ব্যাকগ্রাউন্ডে প্রতি ৫ সেকেন্ড পরপর অটোমেটিক মেইল চেক করার জন্য জব-কিউ সেটআপ
     app.job_queue.run_repeating(background_inbox_checker, interval=5, first=5)
 
     app.add_handler(CommandHandler("start", start))
