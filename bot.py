@@ -30,12 +30,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id: int):
     try:
-        domain_res = requests.get(f"{BASE_URL}/domains", timeout=5)
+        domain_res = requests.get(f"{BASE_URL}/domains")
         if domain_res.status_code != 200:
+            await update.message.reply_text("❌ Failed to fetch domains.")
             return
 
         domains = domain_res.json().get("hydra:member", [])
         if not domains:
+            await update.message.reply_text("❌ No domains available.")
             return
 
         domain = domains[0]["domain"]
@@ -43,20 +45,16 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
         email = f"{username}@{domain}"
         password = generate_random_string(10)
 
-        # অ্যাকাউন্ট তৈরি এবং টোকেন নেওয়ার কাজগুলো একবারে দ্রুত সম্পন্ন করা
-        session = requests.Session()
-        session.post(
+        requests.post(
             f"{BASE_URL}/accounts",
             json={"address": email, "password": password},
             headers={"Content-Type": "application/json"},
-            timeout=5
         )
         
-        token_res = session.post(
+        token_res = requests.post(
             f"{BASE_URL}/token",
             json={"address": email, "password": password},
             headers={"Content-Type": "application/json"},
-            timeout=5
         )
         
         if token_res.status_code == 200:
@@ -64,27 +62,21 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             user_sessions[user_id] = {"email": email, "token": token}
 
             response_text = f"Your temporary email address:\n\n`{email}`"
+
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
-            
-            # অতিরিক্ত ডাবল মেসেজ পাঠানো বন্ধ করা হয়েছে, এক মেসেজেই ইমেল এবং নিচের কিবোর্ড বাটন একসাথে সেট করা হয়েছে
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=response_text, 
+            # এখানে শুধু ইমেইল এবং নিচের কিবোর্ড বাটনগুলো সেট করা হয়েছে, অতিরিক্ত কোনো ইমোজি বা টেক্সট নেই
+            await update.message.reply_text(
+                response_text, 
                 parse_mode="Markdown", 
-                reply_markup=get_main_keyboard()
-            )
-            # ব্রাউজার ওপেন করার জন্য আলাদা ইনলাইন বাটন পাঠানো হচ্ছে
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text="Inbox Management:",
                 reply_markup=reply_markup
             )
+            # কিবোর্ড মেনু এক্টিভ রাখার জন্য নিচের লাইনটি রাখা হয়েছে যাতে নিচে বাটনগুলো সবসময় থাকে
+            await update.message.reply_text("Select an option:", reply_markup=get_main_keyboard())
 
     except Exception as e:
-        pass
+        await update.message.reply_text(f"❌ Error: {e}")
 
 async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual=True):
     user_id = update.effective_user.id
@@ -95,14 +87,13 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
 
     token = user_sessions[user_id]["token"]
     headers = {"Authorization": f"Bearer {token}"}
-    msg_res = requests.get(f"{BASE_URL}/messages", headers=headers, timeout=5)
+    msg_res = requests.get(f"{BASE_URL}/messages", headers=headers)
 
     if msg_res.status_code == 200:
         messages = msg_res.json().get("hydra:member", [])
         if not messages:
             if manual:
-                chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
-                await context.bot.send_message(chat_id=chat_id, text="📭 Inbox is empty. No new messages yet.")
+                await update.message.reply_text("📭 Inbox is empty. No new messages yet.", reply_markup=get_main_keyboard())
         else:
             for msg in messages:
                 msg_id = msg['id']
@@ -110,7 +101,7 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
                     continue
                 
                 seen_messages.add(msg_id)
-                detail_res = requests.get(f"{BASE_URL}/messages/{msg_id}", headers=headers, timeout=5)
+                detail_res = requests.get(f"{BASE_URL}/messages/{msg_id}", headers=headers)
                 detail = detail_res.json()
                 
                 sender = detail.get('from', {}).get('address', 'Unknown')
@@ -166,7 +157,7 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.job_queue.run_repeating(background_inbox_checker, interval=5, first=5)
+    app.job_queue.run_repeating(background_inbox_checker, interval=3, first=3)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, handle_buttons))
