@@ -11,7 +11,7 @@ from telegram.ext import (
 )
 
 BOT_TOKEN = "8688225861:AAHT-8_7O0PDRjy3cWTEp6gfW3b-vpb-CSA"
-BASE_URL = "[https://api.mail.tm](https://api.mail.tm)"
+BASE_URL = "https://api.mail.tm"
 user_sessions = {}
 
 def generate_random_string(length=8):
@@ -43,7 +43,7 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
         email = f"{username}@{domain}"
         password = generate_random_string(10)
 
-        acc_res = requests.post(
+        requests.post(
             f"{BASE_URL}/accounts",
             json={"address": email, "password": password},
             headers={"Content-Type": "application/json"},
@@ -59,7 +59,6 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             token = token_res.json().get("token")
             user_sessions[user_id] = {"email": email, "token": token}
 
-            # শুধু ইমেইল এড্রেসটি ব্যাকটিক্স দিয়ে পাঠানো হলো যাতে ১ ক্লিকে কপি করা যায়
             msg = f"Your temporary email address:\n\n`{email}`"
             await update.message.reply_text(
                 msg, 
@@ -93,7 +92,6 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 subject = detail.get('subject', '')
                 text_body = detail.get('text', '') or detail.get('intro', '')
                 
-                # ওটিপি বা মেসেজটিকে কোড ব্লকে (Backticks) সাজানো যাতে ১ ক্লিকে কপি করা যায়
                 formatted_msg = (
                     f"📩 **New Message Received!**\n\n"
                     f"📌 **Subject:** {subject}\n\n"
