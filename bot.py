@@ -12,7 +12,7 @@ from telegram.ext import (
 )
 
 BOT_TOKEN = "8688225861:AAHT-8_7O0PDRjy3cWTEp6gfW3b-vpb-CSA"
-BASE_URL = "[https://api.mail.tm](https://api.mail.tm)"
+BASE_URL = "https://api.mail.tm"
 user_sessions = {}
 
 def generate_random_string(length=8):
@@ -40,7 +40,7 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             return
 
         domain = domains[0]["domain"]
-        username = f"Hunter_{generate_random_string(6)}"
+        username = f"user_{generate_random_string(6)}"
         email = f"{username}@{domain}"
         password = generate_random_string(10)
 
@@ -60,10 +60,9 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             token = token_res.json().get("token")
             user_sessions[user_id] = {"email": email, "token": token}
 
-            # শুধু নতুন জিমেইল দেখাবে, ডিলিট হওয়া বা অন্য কোনো মেসেজ আসবে না
             response_text = f"Your temporary email address:\n\n`{email}`"
 
-            keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"[https://mail.tm/inbox](https://mail.tm/inbox)")]]
+            keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
             await update.message.reply_text(
@@ -97,25 +96,20 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 detail = detail_res.json()
                 
                 text_body = detail.get('text', '') or detail.get('intro', '')
-                
-                # মেসেজ থেকে শুধু 4 থেকে 6 ডিজিটের ওটিপি/কোড খুঁজে বের করার চেষ্টা করা (যেমন Subject বা Body থেকে)
                 subject = detail.get('subject', '')
                 full_text = f"{subject} {text_body}"
                 
-                # কোড বা ওটিপি খোঁজার রেগুলার এক্সপ্রেশন
                 code_match = re.search(r'\b\d{4,6}\b', full_text)
                 
                 if code_match:
                     otp_code = code_match.group(0)
                     formatted_msg = f"`{otp_code}`"
                 else:
-                    # যদি কোনো সংখ্যা বা কোড না পাওয়া যায়, তবে পুরো বডি বা সাবজেক্ট দেখাবে
                     formatted_msg = f"`{text_body[:100]}`"
                 
-                keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"[https://mail.tm/inbox](https://mail.tm/inbox)")]]
+                keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
                 reply_markup = InlineKeyboardMarkup(keyboard)
 
-                # শুধু ওটিপি বা কোডটি ব্যাকটিক্সে পাঠানো হবে যেন ১ ক্লিকে কপি করা যায়
                 await update.message.reply_text(
                     formatted_msg, 
                     parse_mode="Markdown", 
@@ -130,7 +124,6 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if text == "➕ Generate New / Delete":
         if user_id in user_sessions:
             del user_sessions[user_id]
-        # ডিলিট হওয়ার কোনো মেসেজ না দেখিয়ে সরাসরি নতুন জিমেইল জেনারেট করবে
         await create_or_refresh_account(update, context, user_id)
     elif text == "🔄 Refresh Inbox":
         await check_inbox(update, context)
