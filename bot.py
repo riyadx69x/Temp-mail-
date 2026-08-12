@@ -66,14 +66,19 @@ async def create_or_refresh_account(update: Update, context: ContextTypes.DEFAUL
             keyboard = [[InlineKeyboardButton("Open in Browser ➡️", url=f"https://mail.tm/inbox")]]
             reply_markup = InlineKeyboardMarkup(keyboard)
 
-            # এখানে শুধু ইমেইল এবং নিচের কিবোর্ড বাটনগুলো সেট করা হয়েছে, অতিরিক্ত কোনো ইমোজি বা টেক্সট নেই
-            await update.message.reply_text(
-                response_text, 
+            chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
+            
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=response_text, 
                 parse_mode="Markdown", 
                 reply_markup=reply_markup
             )
-            # কিবোর্ড মেনু এক্টিভ রাখার জন্য নিচের লাইনটি রাখা হয়েছে যাতে নিচে বাটনগুলো সবসময় থাকে
-            await update.message.reply_text("Select an option:", reply_markup=get_main_keyboard())
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="Select an option:",
+                reply_markup=get_main_keyboard()
+            )
 
     except Exception as e:
         await update.message.reply_text(f"❌ Error: {e}")
@@ -93,7 +98,8 @@ async def check_inbox(update: Update, context: ContextTypes.DEFAULT_TYPE, manual
         messages = msg_res.json().get("hydra:member", [])
         if not messages:
             if manual:
-                await update.message.reply_text("📭 Inbox is empty. No new messages yet.", reply_markup=get_main_keyboard())
+                chat_id = update.effective_chat.id if update and hasattr(update, 'effective_chat') and update.effective_chat else user_id
+                await context.bot.send_message(chat_id=chat_id, text="📭 Inbox is empty. No new messages yet.", reply_markup=get_main_keyboard())
         else:
             for msg in messages:
                 msg_id = msg['id']
@@ -157,7 +163,9 @@ async def handle_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
 if __name__ == "__main__":
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    app.job_queue.run_repeating(background_inbox_checker, interval=3, first=3)
+    # এই লাইনটি শুধু রেন্ডারে কাজ করার উপযোগী করে ফিক্স করা হয়েছে
+    if app.job_queue:
+        app.job_queue.run_repeating(background_inbox_checker, interval=3, first=3)
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT, handle_buttons))
